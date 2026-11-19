@@ -1,0 +1,65 @@
+:root {
+  --bs-body-bg: #f4f7fb;
+  --bs-body-color: #16263d;
+  --bs-primary: #2878b5;
+  --bs-secondary-color: #61738a;
+}
+
+.quarto-title-block {
+  margin-bottom: 1.4rem;
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 1.25rem 0 1.5rem;
+}
+
+.kpi {
+  display: flex;
+  min-height: 7rem;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 1.2rem 1.4rem;
+  border: 1px solid #dce4ef;
+  border-radius: 0.8rem;
+  background: #fff;
+}
+
+.kpi-value {
+  color: #2878b5;
+  font-size: clamp(1.7rem, 4vw, 2.5rem);
+  font-weight: 750;
+  line-height: 1.1;
+}
+
+.kpi-label {
+  color: #61738a;
+  font-size: 0.83rem;
+  font-weight: 700;
+  letter-spacing: 0.035em;
+}
+
+blockquote {
+  border-left-color: #12a594 !important;
+  background: #e8f3f4;
+  padding: 0.85rem 1rem;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+@media (max-width: 600px) {
+  .kpi-grid {
+    grid-template-columns: 1fr;
+    gap: 0.6rem;
+  }
+
+  .kpi {
+    min-height: 5.2rem;
+  }
+}

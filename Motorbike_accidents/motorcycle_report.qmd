@@ -1,0 +1,167 @@
+---
+title: "Where do motorcycle-related records cluster?"
+subtitle: "A descriptive profile of recorded deaths and rider characteristics in Colombia"
+author: "Road safety data brief"
+date: last-modified
+format:
+  html:
+    theme: flatly
+    toc: false
+    page-layout: full
+    embed-resources: true
+    css: motorcycle_report.css
+jupyter: python3
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{python}
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import pandas as pd
+from IPython.display import HTML, display
+
+DATA_PATH = Path("motorcycle_accidents_colombia.csv")
+data = pd.read_csv(DATA_PATH)
+
+required = {
+    "date_of_death",
+    "gender",
+    "age group",
+    "department of residence",
+    "municipality_of_residence",
+    "condition",
+}
+missing = required.difference(data.columns)
+if missing:
+    raise ValueError(f"CSV is missing required columns: {', '.join(sorted(missing))}")
+
+data["date_of_death"] = pd.to_datetime(data["date_of_death"], errors="coerce", utc=True)
+total = len(data)
+if not total:
+    raise ValueError("The CSV contains no records.")
+
+antioquia_count = data["department of residence"].str.casefold().eq("antioquia").sum()
+medellin_count = data["municipality_of_residence"].str.casefold().eq("medellín").sum()
+age_20_24_count = data["age group"].eq("20-24").sum()
+age_20_34_count = data["age group"].isin(["20-24", "25-29", "30-34"]).sum()
+valid_dates = data["date_of_death"].dropna()
+if valid_dates.empty:
+    raise ValueError("No valid date_of_death values are available.")
+period = f"{valid_dates.min():%Y-%m-%d} to {valid_dates.max():%Y-%m-%d}"
+
+municipality_counts = (
+    data.loc[
+        data["municipality_of_residence"].str.casefold().ne("unknown"),
+        "municipality_of_residence",
+    ]
+    .value_counts()
+    .head(8)
+    .sort_values()
+)
+age_gender_counts = pd.crosstab(data["age group"], data["gender"])
+age_order = sorted(
+    age_gender_counts.index,
+    key=lambda band: int(str(band).split("-")[0]) if str(band).split("-")[0].isdigit() else 999,
+)
+age_gender_counts = age_gender_counts.reindex(age_order)
+yearly_counts = valid_dates.dt.year.value_counts().sort_index()
+
+display(
+    HTML(
+        f"""
+        <div class="kpi-grid">
+          <div class="kpi"><span class="kpi-value">{total:,}</span><span class="kpi-label">Person records in file</span></div>
+          <div class="kpi"><span class="kpi-value">{medellin_count / total:.1%}</span><span class="kpi-label">List Medellín as residence</span></div>
+          <div class="kpi"><span class="kpi-value">{age_20_24_count / total:.1%}</span><span class="kpi-label">Aged 20–24</span></div>
+        </div>
+        """
+    )
+)
+```
+
+> **INSIGHT** · Ages 20–34 account for **{age_20_34_count:,} of {total:,} records ({age_20_34_count / total:.1%})**. Antioquia is the listed department of residence for **{antioquia_count:,} records ({antioquia_count / total:.1%})**.
+
+The supplied file describes **person records**, not all reported crash incidents. Residence is not necessarily crash location, and the dataset has no injury-severity field.
+
+## What the records show
+
+```{python}
+fig, ax = plt.subplots(figsize=(8, 4.1))
+municipality_counts.plot(kind="barh", ax=ax, color="#2878b5", width=0.68)
+ax.set_title("Records by municipality of residence", loc="left", fontsize=14, fontweight="bold", color="#16263d")
+ax.set_xlabel("Person records in supplied file")
+ax.set_ylabel("")
+ax.grid(axis="x", color="#dce4ef")
+ax.set_axisbelow(True)
+ax.spines[["top", "right", "left"]].set_visible(False)
+ax.spines["bottom"].set_color("#dce4ef")
+ax.tick_params(axis="y", length=0)
+ax.set_xlim(0, municipality_counts.max() * 1.18)
+for y, value in enumerate(municipality_counts.values):
+    ax.text(value + municipality_counts.max() * 0.015, y, f"{value:,}", va="center", fontsize=9, color="#16263d")
+fig.tight_layout()
+plt.show()
+```
+
+Medellín is the most frequently listed municipality of residence (**{medellin_count:,} records**). This cannot be interpreted as a count of crashes occurring in Medellín.
+
+```{python}
+fig, ax = plt.subplots(figsize=(8, 4.2))
+age_gender_counts.plot(
+    kind="bar",
+    stacked=True,
+    ax=ax,
+    color=["#e69b37" if str(gender).casefold() == "female" else "#2878b5" for gender in age_gender_counts.columns],
+    width=0.72,
+)
+ax.set_title("Records by age group and gender", loc="left", fontsize=14, fontweight="bold", color="#16263d")
+ax.set_xlabel("Age group")
+ax.set_ylabel("Person records in supplied file")
+ax.grid(axis="y", color="#dce4ef")
+ax.set_axisbelow(True)
+ax.spines[["top", "right"]].set_visible(False)
+ax.spines["left"].set_color("#dce4ef")
+ax.spines["bottom"].set_color("#dce4ef")
+ax.tick_params(axis="x", rotation=40)
+ax.legend(title="Gender", frameon=False)
+fig.tight_layout()
+plt.show()
+```
+
+The 20–24 group is the largest single age band (**{age_20_24_count:,} records**). Counts and group shares describe only the supplied file; without population or travel-exposure denominators, they do not compare risk.
+
+```{python}
+fig, ax = plt.subplots(figsize=(8, 3.4))
+yearly_counts.plot(kind="bar", ax=ax, color="#12a594", width=0.58)
+ax.set_title("Records by year of death", loc="left", fontsize=14, fontweight="bold", color="#16263d")
+ax.set_xlabel("Year")
+ax.set_ylabel("Person records in supplied file")
+ax.grid(axis="y", color="#dce4ef")
+ax.set_axisbelow(True)
+ax.spines[["top", "right"]].set_visible(False)
+ax.spines["left"].set_color("#dce4ef")
+ax.spines["bottom"].set_color("#dce4ef")
+ax.tick_params(axis="x", rotation=0)
+for x, value in enumerate(yearly_counts.values):
+    ax.text(x, value + yearly_counts.max() * 0.02, f"{value}", ha="center", fontsize=9, color="#16263d")
+ax.set_ylim(0, yearly_counts.max() * 1.14)
+fig.tight_layout()
+plt.show()
+```
+
+Dates in this file are **dates of death**, covering **{period}**. They are not crash dates or times, so the annual counts are not a crash trend.
+
+## Data, tool, and interpretation
+
+- **Tool:** Python, pandas, Matplotlib, and Quarto.
+- **Dataset:** `motorcycle_accidents_colombia.csv`, the file supplied with this project. The upstream publisher/URL was not included.
+- **Reporting period:** {period}, calculated from valid `date_of_death` values.
+- **Caution:** The file has no crash-site location, incident identifier, non-fatal records, explicit severity measure, or exposure denominator. It cannot answer where crashes occurred or how crash severity varies. The reported counts are not measures of underlying road-safety risk.
+
+To answer the original crash-location and severity question, obtain incident-level data with crash coordinates/location, crash date, explicit injury outcome categories, coverage information, and suitable exposure denominators.
+
+<!-- Add the official challenge hashtag here before publishing. -->
